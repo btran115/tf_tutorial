@@ -41,11 +41,13 @@ def bias_variable(shape):
 	return tf.Variable(initial)
 
 #we implement convolution and pooling here
+#for each batch of the input (with pads of 0s), take the batch as a vector
+#mat mul with flattened weights
 def conv2d(x,W):
 	return tf.nn.conv2d(x,W,strides = [1,1,1,1], padding = 'SAME')
 #here ksize specifices size of window for each dimension of the input
 #middle two dimensions are x and y axis of image
-#stride is similar
+#stride is similar, output cuts size dims in half
 def max_pool_2x2(x):
 	return tf.nn.max_pool(x, ksize = [1,2,2,1], strides = [1,2,2,1], padding = 'SAME')
 
@@ -58,21 +60,30 @@ b_conv1 = bias_variable([32])
 #-1 is used so that total size remains constant
 x_image = tf.reshape(x, [-1, 28, 28, 1])
 # compute middle layers by first convolution and then pooling
-#h_conv1 applies relu to a subset of the graph, where h takes as input
-#some 5x5 patch of the input with weights W_conv1
-#then h_pool pools the results of h_conv1
+#h_conv1 takes conv for each batch, adds bias, applies relu 28x28 out
+#then h_pool pools the results of h_conv1, 14x14 now but with 32 channels
 h_conv1 = tf.nn.relu(conv2d(x_image, W_conv1)+b_conv1)
 h_pool1 = max_pool_2x2(h_conv1)
 
-#layer 2
+#layer 2, image now 7x7 with 64 channels
 W_conv2 = weight_variable([5,5,32,64])
 b_conv2 = bias_variable([64])
 h_conv2 = tf.nn.relu(conv2d(h_pool1, W_conv2)+b_conv2)
 h_pool2 = max_pool_2x2(h_conv2)
 
-#last fully connected layer
+#fully connected layer. we just matmul, no relu or conv or anything
 W_fc1 = weight_variable([7*7*64, 1024])
 b_fc1 = bias_variable([1024])
 
 h_pool2_flat = tf.reshape(h_pool2, [-1, 7*7*64])
 h_fc1 = tf.nn.relu(tf.matmul(h_pool2_flat, W_fc1) + b_fc1)
+
+#dropout but only on the output of the fully connected layer
+keep_prob = tf.placeholder(tf.float32)
+h_fc1_drop = tf.nn.dropout(h_fc1, keep_prob)
+
+#
+W_fc2 = weight_variable([1024, 10])
+b_fc2 = bias_variable([10])
+
+y_conv = tf.matmul(h_fc1_drop, W_fc2) + b_fc2
